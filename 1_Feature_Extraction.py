@@ -2,9 +2,8 @@ import cv2
 import os
 
 # Define the directory containing the images
-input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\images'
-output_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\IMG_1_featExtraction_Output'
-
+input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\images'
+output_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_1_featExtraction_Output'
 # Ensure the output folder exists
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
@@ -14,7 +13,7 @@ sift = cv2.SIFT_create()
 
 # Loop through all files in the input folder
 for filename in os.listdir(input_folder):
-    if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.webp')):
+    if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif',)):
         # Construct the full file path
         filepath = os.path.join(input_folder, filename)
 

@@ -1,78 +1,60 @@
 import cv2
-import numpy as np
 import os
+import numpy as np
+from itertools import combinations
 
-# Define input folder containing feature matched images
-input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\IMG_2_featMatching_Output'
+# Define the directory containing the images
+input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_1_featExtraction_Output'
+output_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_2'
 
-# Create SIFT detector and BFMatcher
+# Ensure the output folder exists
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+# Create a SIFT detector and BFMatcher
 sift = cv2.SIFT_create()
 bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 
-# Function to perform camera pose estimation and triangulation
-def estimate_camera_poses_and_triangulate(images_folder):
-    images = []
-    keypoints = []
-    descriptors = []
+# Load images and detect features
+images = []
+keypoints = []
+descriptors = []
+filenames = []
 
-    # Load images and detect features
-    for filename in os.listdir(images_folder):
-        if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.webp')):
-            filepath = os.path.join(images_folder, filename)
-            img = cv2.imread(filepath)
-            if img is None:
-                print(f'Failed to load image: {filepath}')
-                continue
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            kp, des = sift.detectAndCompute(gray, None)
-            images.append(img)
-            keypoints.append(kp)
-            descriptors.append(des)
-            print(f'Processed {filename}, found {len(kp)} keypoints')
-
-    # Estimate camera poses and triangulate points
-    points_3D = []
-    for i in range(len(images) - 1):
-        img1 = images[i]
-        img2 = images[i + 1]
-        kp1 = keypoints[i]
-        kp2 = keypoints[i + 1]
-        des1 = descriptors[i]
-        des2 = descriptors[i + 1]
-
-        # Match descriptors
-        matches = bf.match(des1, des2)
-        matches = sorted(matches, key=lambda x: x.distance)
-
-        # Get matched keypoints
-        pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-        pts2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-
-        if len(pts1) == 0 or len(pts2) == 0:
+for filename in os.listdir(input_folder):
+    if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.webp')):
+        filepath = os.path.join(input_folder, filename)
+        img = cv2.imread(filepath)
+        if img is None:
+            print(f'Failed to load image: {filepath}')
             continue
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        kp, des = sift.detectAndCompute(gray, None)
+        images.append(img)
+        keypoints.append(kp)
+        descriptors.append(des)
+        filenames.append(filename)
+        print(f'Processed {filename}, found {len(kp)} keypoints')
 
-        # Estimate essential matrix using RANSAC
-        E, mask = cv2.findEssentialMat(pts1, pts2, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+# Perform exhaustive matching between each pair of images
+for (i, j) in combinations(range(len(images)), 2):
+    img1 = images[i]
+    img2 = images[j]
+    kp1 = keypoints[i]
+    kp2 = keypoints[j]
+    des1 = descriptors[i]
+    des2 = descriptors[j]
 
-        # Recover the relative camera pose (rotation and translation)
-        _, R, t, mask = cv2.recoverPose(E, pts1, pts2)
+    # Match descriptors
+    matches = bf.match(des1, des2)
+    matches = sorted(matches, key=lambda x: x.distance)
 
-        # Triangulate points to get 3D coordinates
-        P1 = np.eye(3, 4)  # Identity matrix for simplicity (intrinsic matrix)
-        P2 = np.hstack((R, t))
-        pts4D_hom = cv2.triangulatePoints(P1, P2, pts1, pts2)
-        pts4D = pts4D_hom / pts4D_hom[3]
+    # Draw matches
+    img_matches = cv2.drawMatches(img1, kp1, img2, kp2, matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
-        # Convert points to 3D
-        points_3D.extend(pts4D[:3].T.tolist())
+    # Save the matching image
+    output_path = os.path.join(output_folder, f'matches_{filenames[i]}_{filenames[j]}.jpg')
+    cv2.imwrite(output_path, img_matches)
+    print(f'Saved matching result: {output_path}')
 
-    return np.array(points_3D)
-
-# Perform camera pose estimation and triangulation
-sparse_point_cloud = estimate_camera_poses_and_triangulate(input_folder)
-
-# Save sparse point cloud to file (e.g., as CSV or numpy array)
-output_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\sparse_point_cloud.npy'
-np.save(output_file, sparse_point_cloud)
-
-print(f'Sparse point cloud saved: {output_file}')
+print('Feature matching completed!')

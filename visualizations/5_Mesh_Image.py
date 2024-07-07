@@ -6,8 +6,8 @@ import cv2
 import os
 
 # Define input paths
-sparse_point_cloud_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\visualizations\sparse_point_cloud.npy'
-input_images_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\images'
+sparse_point_cloud_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\3_SFM\sparse.npy'
+input_images_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\images'
 
 # Load sparse point cloud
 points = np.load(sparse_point_cloud_file)

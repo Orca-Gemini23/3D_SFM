@@ -1,46 +1,60 @@
-import numpy as np
-from scipy.spatial import Delaunay
-import open3d as o3d
+import cv2
 import os
+import numpy as np
+from itertools import combinations
 
-# Load the sparse point cloud (assuming it's stored as a numpy array)
-sparse_point_cloud_file = 'C:\\Users\\csyas\\OneDrive\\Desktop\\projects\\3d_Construction\\sparse_point_cloud.npy'
-sparse_point_cloud = np.load(sparse_point_cloud_file)
+# Define the directory containing the images
+input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_1_featExtraction_Output'
+output_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_2'
 
-# Perform Delaunay tetrahedralization
-tri = Delaunay(sparse_point_cloud)
-
-# Extract vertices and tetrahedra
-vertices = sparse_point_cloud
-tetrahedra = tri.simplices
-
-# Create an Open3D mesh from the tetrahedra
-mesh = o3d.geometry.TriangleMesh()
-
-# Add vertices to the mesh
-mesh.vertices = o3d.utility.Vector3dVector(vertices)
-
-# Convert tetrahedra to triangles for visualization (Open3D doesn't support tetrahedra directly)
-triangles = []
-for tet in tetrahedra:
-    triangles.append([tet[0], tet[1], tet[2]])
-    triangles.append([tet[0], tet[1], tet[3]])
-    triangles.append([tet[0], tet[2], tet[3]])
-    triangles.append([tet[1], tet[2], tet[3]])
-
-mesh.triangles = o3d.utility.Vector3iVector(np.array(triangles))
-
-# Optionally, compute vertex normals
-mesh.compute_vertex_normals()
-
-# Save the mesh to a file
-output_folder = 'C:\\Users\\csyas\\OneDrive\\Desktop\\projects\\3d_Construction\\mesh_output'
+# Ensure the output folder exists
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
-mesh_file = os.path.join(output_folder, 'mesh.ply')
-o3d.io.write_triangle_mesh(mesh_file, mesh)
 
-# Visualize the mesh
-o3d.visualization.draw_geometries([mesh])
+# Create a SIFT detector and BFMatcher
+sift = cv2.SIFT_create()
+bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 
-print('Mesh construction completed and saved to:', mesh_file)
+# Load images and detect features
+images = []
+keypoints = []
+descriptors = []
+filenames = []
+
+for filename in os.listdir(input_folder):
+    if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.webp')):
+        filepath = os.path.join(input_folder, filename)
+        img = cv2.imread(filepath)
+        if img is None:
+            print(f'Failed to load image: {filepath}')
+            continue
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        kp, des = sift.detectAndCompute(gray, None)
+        images.append(img)
+        keypoints.append(kp)
+        descriptors.append(des)
+        filenames.append(filename)
+        print(f'Processed {filename}, found {len(kp)} keypoints')
+
+# Perform exhaustive matching between each pair of images
+for (i, j) in combinations(range(len(images)), 2):
+    img1 = images[i]
+    img2 = images[j]
+    kp1 = keypoints[i]
+    kp2 = keypoints[j]
+    des1 = descriptors[i]
+    des2 = descriptors[j]
+
+    # Match descriptors
+    matches = bf.match(des1, des2)
+    matches = sorted(matches, key=lambda x: x.distance)
+
+    # Draw matches
+    img_matches = cv2.drawMatches(img1, kp1, img2, kp2, matches[:50], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+    # Save the matching image
+    output_path = os.path.join(output_folder, f'matches_{filenames[i]}_{filenames[j]}.jpg')
+    cv2.imwrite(output_path, img_matches)
+    print(f'Saved matching result: {output_path}')
+
+print('Feature matching completed!')

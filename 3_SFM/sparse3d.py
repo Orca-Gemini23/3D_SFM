@@ -2,21 +2,20 @@ import cv2
 import numpy as np
 import os
 
-# Define input folder containing feature matched images
-input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\IMG_2_featMatching_Output'
-output_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\IMG_3_SFM'
-output_file = os.path.join(output_folder, 'camera_poses.npy')
+# Define input folders and files
+input_folder = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\IMG_2'
+camera_poses_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\3_SFM\camera_poses.npy'
+output_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\3_SFM\sparse.npy'
 
-# Ensure output folder exists
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+# Load camera poses
+camera_poses = np.load(camera_poses_file, allow_pickle=True)
 
 # Create SIFT detector and BFMatcher
 sift = cv2.SIFT_create()
 bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 
-# Function to perform camera pose estimation
-def estimate_camera_poses(images_folder):
+# Function to perform triangulation
+def triangulate_points(images_folder, camera_poses):
     images = []
     keypoints = []
     descriptors = []
@@ -36,8 +35,7 @@ def estimate_camera_poses(images_folder):
             descriptors.append(des)
             print(f'Processed {filename}, found {len(kp)} keypoints')
 
-    # Estimate camera poses
-    camera_poses = []
+    points_3D = []
     for i in range(len(images) - 1):
         img1 = images[i]
         img2 = images[i + 1]
@@ -57,25 +55,29 @@ def estimate_camera_poses(images_folder):
         if len(pts1) == 0 or len(pts2) == 0:
             continue
 
-        # Estimate essential matrix using RANSAC
-        E, mask = cv2.findEssentialMat(pts1, pts2, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+        # Get camera poses for the two images
+        pose1 = camera_poses[i]
+        pose2 = camera_poses[i + 1]
+        R1, t1 = pose1['rotation'], pose1['translation']
+        R2, t2 = pose2['rotation'], pose2['translation']
 
-        # Recover the relative camera pose (rotation and translation)
-        _, R, t, mask = cv2.recoverPose(E, pts1, pts2)
+        # Create projection matrices
+        P1 = np.hstack((R1, t1))
+        P2 = np.hstack((R2, t2))
 
-        # Store the camera pose (rotation matrix and translation vector)
-        camera_pose = {
-            'rotation': R,
-            'translation': t
-        }
-        camera_poses.append(camera_pose)
+        # Triangulate points to get 3D coordinates
+        pts4D_hom = cv2.triangulatePoints(P1, P2, pts1, pts2)
+        pts4D = pts4D_hom / pts4D_hom[3]
 
-    return camera_poses
+        # Convert points to 3D
+        points_3D.extend(pts4D[:3].T.tolist())
 
-# Perform camera pose estimation
-camera_poses = estimate_camera_poses(input_folder)
+    return np.array(points_3D)
 
-# Save camera poses to .npy file
-np.save(output_file, camera_poses)
+# Perform triangulation
+sparse_point_cloud = triangulate_points(input_folder, camera_poses)
 
-print(f'Camera poses saved to {output_file}')
+# Save sparse point cloud to file
+np.save(output_file, sparse_point_cloud)
+
+print(f'Sparse point cloud saved: {output_file}')

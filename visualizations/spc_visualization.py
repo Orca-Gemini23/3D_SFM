@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 # Paths to the input files
-sparse_point_cloud_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\visualizations\sparse_point_cloud.npy'
-camera_poses_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3d_Construction\IMG_3_SFM\camera_poses.npy'
+sparse_point_cloud_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\3_SFM\sparse.npy'
+camera_poses_file = r'C:\Users\csyas\OneDrive\Desktop\projects\3D_SFM\3_SFM\camera_poses.npy'
 
 # Load the sparse point cloud and camera poses
 sparse_point_cloud = np.load(sparse_point_cloud_file)
